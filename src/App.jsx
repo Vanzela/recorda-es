@@ -1,18 +1,28 @@
-import { HashRouter, Routes, Route, Link } from "react-router-dom";
-import Home from "./pages/Home";
-import Admin from "./pages/Admin";
+import { HashRouter, Routes, Route } from "react-router-dom";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import AlbumPublico from "./pages/AlbumPublico";
+import AlbumAdmin from "./pages/AlbumAdmin";
+import RequireAuth from "./components/RequireAuth";
 
 export default function App() {
   return (
     <HashRouter>
-      <nav style={{ padding: 16, display: "flex", gap: 12 }}>
-        <Link to="/">Público</Link>
-        <Link to="/admin">Admin</Link>
-      </nav>
-
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/admin" element={<Admin />} />
+        {/* 1) Home: se não logar, cai no login */}
+        <Route path="/" element={<RequireAuth><Dashboard /></RequireAuth>} />
+
+        {/* 2) Login */}
+        <Route path="/login" element={<Login />} />
+
+        {/* 3) Dashboard (logado) */}
+        <Route path="/dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
+
+        {/* 4) Admin de um álbum (publicar recordações no álbum certo) */}
+        <Route path="/dashboard/album/:id" element={<RequireAuth><AlbumAdmin /></RequireAuth>} />
+
+        {/* 5) Público: link do álbum */}
+        <Route path="/a/:slug" element={<AlbumPublico />} />
       </Routes>
     </HashRouter>
   );
