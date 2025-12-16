@@ -16,7 +16,7 @@ export default function AlbumAdmin() {
     const isGhPages = window.location.hostname.includes("github.io");
 
     const baseUrl = isGhPages
-        ? window.location.origin + "/recordaco-es/" // 🔴 TROQUE pelo nome real do repo
+        ? window.location.origin + "/recorda-es/" // 🔴 TROQUE pelo nome real do repo
         : window.location.origin + "/";
         
     const publicLink = album ? `${baseUrl}#/a/${album.slug}` : "";
