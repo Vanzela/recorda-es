@@ -3,21 +3,25 @@ import { supabase } from "../lib/supabase";
 import { Link, useNavigate } from "react-router-dom";
 import QRCode from "qrcode";
 
+
 export default function Dashboard() {
     const [session, setSession] = useState(null);
     const [albums, setAlbums] = useState([]);
     const [title, setTitle] = useState("");
     const [slug, setSlug] = useState("");
     const [msg, setMsg] = useState("");
+    const [showNew, setShowNew] = useState(false);
+    const [openMenuId, setOpenMenuId] = useState(null);
+    const [qrAlbum, setQrAlbum] = useState(null);
+    const [qrDataUrl, setQrDataUrl] = useState("");
+
+
     const navigate = useNavigate();
 
-    // link base certo pro GitHub Pages + HashRouter
-    const isGhPages = window.location.hostname.includes("github.io");
-
-    const baseUrl = isGhPages
-        ? window.location.origin + "/recorda-es/" // 🔴 TROQUE pelo nome real do repo
-        : window.location.origin + "/";
-
+    const baseUrl = useMemo(() => {
+        // GH Pages + HashRouter: mantém /recorda-es/ e / no local
+        return window.location.origin + window.location.pathname;
+    }, []);
 
     useEffect(() => {
         supabase.auth.getSession().then(({ data }) => {
@@ -30,7 +34,14 @@ export default function Dashboard() {
             loadAlbums();
         });
 
-        return () => sub.subscription.unsubscribe();
+        const closeMenus = () => setOpenMenuId(null);
+        window.addEventListener("click", closeMenus);
+
+        return () => {
+            sub.subscription.unsubscribe();
+            window.removeEventListener("click", closeMenus);
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     async function loadAlbums() {
@@ -45,7 +56,8 @@ export default function Dashboard() {
     function makeSlug(v) {
         return v
             .toLowerCase()
-            .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/(^-|-$)+/g, "");
     }
@@ -63,6 +75,7 @@ export default function Dashboard() {
         if (!owner_id) return;
 
         const finalSlug = makeSlug(slug || title);
+
         const { error } = await supabase.from("albums").insert({
             owner_id,
             title: title.trim(),
@@ -74,6 +87,7 @@ export default function Dashboard() {
         if (!error) {
             setTitle("");
             setSlug("");
+            setShowNew(false);
             loadAlbums();
         }
     }
@@ -95,7 +109,9 @@ export default function Dashboard() {
     }
 
     async function deleteAlbum(a) {
-        const ok = confirm(`Excluir o álbum "${a.title}"? (vai apagar as memórias dele também)`);
+        const ok = confirm(
+            `Excluir o álbum "${a.title}"? (vai apagar as memórias dele também)`
+        );
         if (!ok) return;
 
         const { error } = await supabase.from("albums").delete().eq("id", a.id);
@@ -103,7 +119,7 @@ export default function Dashboard() {
         else loadAlbums();
     }
 
-    async function copyLink(a) {
+    async function copyFofo(a) {
         const link = `${baseUrl}#/a/${a.slug}`;
         const textoFofo =
             `✨ Separei um álbum de recordações pra você:\n` +
@@ -111,22 +127,24 @@ export default function Dashboard() {
             `Depois me conta qual foto você mais gostou 💛`;
 
         await navigator.clipboard.writeText(textoFofo);
-        alert("Copiado! ✅ (com mensagem fofa)");
+        alert("Copiado! ✅");
     }
 
     async function openQr(a) {
+        if (qrAlbum?.id === a.id) {
+            // se clicar de novo, fecha
+            setQrAlbum(null);
+            setQrDataUrl("");
+            return;
+        }
+
         const link = `${baseUrl}#/a/${a.slug}`;
         const dataUrl = await QRCode.toDataURL(link, { margin: 1, scale: 6 });
-        const w = window.open("", "_blank");
-        w.document.write(`
-      <div style="font-family:system-ui;padding:16px">
-        <h3>${a.title}</h3>
-        <p><a href="${link}">${link}</a></p>
-        <img src="${dataUrl}" style="width:260px;height:260px"/>
-        <p>Escaneie o QR e abra o álbum ✨</p>
-      </div>
-    `);
+
+        setQrAlbum(a);
+        setQrDataUrl(dataUrl);
     }
+
 
     async function logout() {
         await supabase.auth.signOut();
@@ -134,68 +152,140 @@ export default function Dashboard() {
     }
 
     return (
-        <div id="body-dashboard">
-            <header>
-                <h2>Dashboard</h2>
-                <div >
-                    Logado como <b>{session?.user?.email}</b>
+        <div className="dash">
+            {/* SIDEBAR */}
+            <aside className="dash__side">
+                <div className="side__top">
+                    <img className="side__logo" src="./src/assets/RTICO.jpg" alt="Logo" />
+                    <div className="side__email">
+                        Logado como <b>{session?.user?.email}</b>
+                    </div>
+
+                    <button
+                        className="btn btn--primary"
+                        onClick={() => setShowNew((s) => !s)}
+                    >
+                        {showNew ? "Fechar" : "+ Novo álbum"}
+                    </button>
+
+                    {showNew && (
+                        <div className="side__panel">
+                            <div className="panel__title">Criar novo álbum</div>
+
+                            <form onSubmit={createAlbum} className="form">
+                                <input
+                                    placeholder="Título do álbum (ex: Eu & Você 💛)"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                    required
+                                />
+                                <input
+                                    placeholder="Slug do link (ex: eu-e-voce)"
+                                    value={slug}
+                                    onChange={(e) => setSlug(e.target.value)}
+                                    required
+                                />
+                                <button className="btn btn--ok" type="submit">
+                                    Criar
+                                </button>
+                                {msg && <small className="muted">{msg}</small>}
+                            </form>
+                        </div>
+                    )}
                 </div>
-                <button id="Button-logout" onClick={logout}>Sair</button>
-            </header>
 
-            <hr style={{ margin: "16px 0", opacity: 0.2 }} />
+                <div className="side__bottom">
+                    <button className="btn btn--ghost" onClick={logout}>
+                        Sair
+                    </button>
+                </div>
+            </aside>
 
-            <h3>Criar novo álbum</h3>
-            <form onSubmit={createAlbum} style={{ display: "grid", gap: 10, maxWidth: 520 }}>
-                <input
-                    placeholder="Título do álbum (ex: Viagem Rio 2025)"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    required
-                />
-                <input
-                    placeholder="Slug do link (ex: viagem-rio-2025)"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
-                    required
-                />
-                <button type="submit">Criar</button>
-                {msg && <small>{msg}</small>}
-            </form>
+            {/* MAIN */}
+            <main className="dash__main">
+                <header className="main__header">
+                    <h2>Álbuns ativos</h2>
+                    <div className="muted">
+                        {albums.length} {albums.length === 1 ? "álbum" : "álbuns"}
+                    </div>
+                </header>
 
-            <hr style={{ margin: "16px 0", opacity: 0.2 }} />
+                <div className="grid">
+                    {albums.map((a) => {
+                        const link = `${baseUrl}#/a/${a.slug}`;
 
-            <h3>Meus álbuns</h3>
-            <div style={{ display: "grid", gap: 10 }}>
-                {albums.map((a) => {
-                    const link = `${baseUrl}#/a/${a.slug}`;
-                    return (
-                        <div key={a.id} style={{ border: "1px solid #ddd", borderRadius: 12, padding: 12 }}>
-                            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                                <div>
-                                    <b>{a.title}</b>{" "}
-                                    <span style={{ opacity: 0.7 }}>({a.slug})</span>
-                                    <div style={{ fontSize: 13, opacity: 0.75 }}>
-                                        Link: <a href={link}>{link}</a>
+                        return (
+                            <div key={a.id} className="card">
+                                <div className="card__top">
+                                    <div>
+                                        <div className="card__title">{a.title}</div>
+                                        <div className="card__link">
+                                            <a href={link} target="_blank" rel="noreferrer">
+                                                {link}
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    {/* menu 3 pontinhos */}
+                                    <div className="menuWrap" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                            className="iconBtn"
+                                            onClick={() =>
+                                                setOpenMenuId((id) => (id === a.id ? null : a.id))
+                                            }
+                                            aria-label="Menu"
+                                        >
+                                            ⋯
+                                        </button>
+
+                                        {openMenuId === a.id && (
+                                            <div className="menu">
+                                                <button onClick={() => navigate(`/dashboard/album/${a.id}`)}>
+                                                    Gerenciar
+                                                </button>
+                                                <button onClick={() => openQr(a)}>QR Code</button>
+                                                <button onClick={() => editAlbum(a)}>Editar nome do Album</button>
+                                                <div className="menu__sep" />
+                                                <button className="danger" onClick={() => deleteAlbum(a)}>
+                                                    Excluir
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                                    <button onClick={() => navigate(`/dashboard/album/${a.id}`)}>Publicar</button>
-                                    <button onClick={() => copyLink(a)}>Copiar link</button>
-                                    <button onClick={() => openQr(a)}>QR Code</button>
-                                    <button onClick={() => editAlbum(a)}>Editar</button>
-                                    <button onClick={() => deleteAlbum(a)} style={{ color: "tomato" }}>Excluir</button>
-                                </div>
-                            </div>
+                                <div className="card__actions">
+                                    <button className="btn btn--share" onClick={() => copyFofo(a)}>
+                                        Compartilhar
+                                    </button>
 
-                            <div style={{ marginTop: 8 }}>
-                                <Link to={`/a/${a.slug}`}>Abrir público</Link>
+                                    <Link className="link" to={`/a/${a.slug}`}>
+                                        Abrir→
+                                    </Link>
+                                </div>
+                                {qrAlbum?.id === a.id && (
+                                    <div className="qrBox">
+                                        <img src={qrDataUrl} alt="QR Code" />
+                                        <div className="qrText">
+                                            Escaneie ou compartilhe este álbum ✨
+                                        </div>
+                                    </div>
+                                )}
+
+                            </div>
+                        );
+                    })}
+
+                    {!albums.length && (
+                        <div className="empty">
+                            <div className="empty__title">Nenhum álbum ainda</div>
+                            <div className="muted">
+                                Clique em <b>+ Novo álbum</b> pra começar ✨
                             </div>
                         </div>
-                    );
-                })}
-            </div>
+                    )}
+                </div>
+            </main>
         </div>
     );
 }
