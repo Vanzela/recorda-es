@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import QRCode from "qrcode";
+import { albumPublicLink } from "../lib/publicUrl";
 
 export default function AlbumAdmin() {
     const { id } = useParams(); // album_id
@@ -13,13 +14,8 @@ export default function AlbumAdmin() {
     const [qrDataUrl, setQrDataUrl] = useState("");
 
 
-    const isGhPages = window.location.hostname.includes("github.io");
 
-    const baseUrl = isGhPages
-        ? window.location.origin + "/recorda-es/" // 🔴 TROQUE pelo nome real do repo
-        : window.location.origin + "/";
-        
-    const publicLink = album ? `${baseUrl}#/a/${album.slug}` : "";
+    const publicLink = album ? albumPublicLink(album.slug) : "";
 
     useEffect(() => {
         load();

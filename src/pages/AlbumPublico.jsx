@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import "../App.css";
+import "../index.css";
 
 export default function AlbumPublico() {
   const { slug } = useParams();

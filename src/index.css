@@ -12,7 +12,6 @@ body {
   overflow: auto;
 }
 
-login
 
 .login-page {
   min-height: 100vh;
@@ -81,7 +80,7 @@ login
   box-shadow: 10px 15px 30px rgba(109, 109, 109, 0.389);
 }
 
-dashboard
+
 
 #body-dashboard{
   width: 100vw;
